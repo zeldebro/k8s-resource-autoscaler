@@ -1,0 +1,22 @@
+interval: 30 #minute
+thresholds:
+  diskUsage:
+    resize: 80 # Percentage
+  networkUsage:
+    ingress:
+      scale: 100 # Bytes per second
+
+autoscaler:
+  desiredReplicaCount: 2
+  interval: 5 # Minutes
+prometheus:
+  url: "http://127.0.0.1:9090"
+  disk_usage_query: |
+    (kubelet_volume_stats_used_bytes{persistentvolumeclaim="{{pvc_name}}", namespace="{{namespace}}"} / 
+    kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="{{pvc_name}}", namespace="{{namespace}}"}) * 100
+  network_usage_queries:
+    ingress: |
+      sum(rate(container_network_receive_bytes_total{pod="{{pod_name}}", namespace="{{namespace}}"}[30m]))
+    egress: |
+      sum(rate(container_network_transmit_bytes_total{pod="{{pod_name}}", namespace="{{namespace}}"}[30m]))
+
