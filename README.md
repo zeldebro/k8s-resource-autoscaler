@@ -1,5 +1,3 @@
-Here's the updated `README.md` file, incorporating the specific commands for running the application in different modes and specifying the required Go version as **1.19**:
-
 ```markdown
 # Kubernetes Resource Autoscaler
 
