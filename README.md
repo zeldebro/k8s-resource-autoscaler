@@ -1,120 +1,132 @@
+Here's the updated `README.md` file, incorporating the specific commands for running the application in different modes and specifying the required Go version as **1.19**:
+
 ```markdown
 # Kubernetes Resource Autoscaler
 
-## Overview
-
-This project is a Kubernetes Resource Autoscaler designed to automatically increase Persistent Volume Claim (PVC) size based on disk capacity and monitor ingress and egress traffic for deployments. It uses Prometheus to collect metrics and trigger scaling actions based on defined thresholds.
+## Project Overview
+The Kubernetes Resource Autoscaler automatically adjusts the size of Persistent Volume Claims (PVC) based on capacity and monitors ingress and egress bandwidth.
 
 ## Features
-
-- Automatic resizing of PVCs when disk usage exceeds defined thresholds.
-- Monitoring of ingress and egress network traffic for deployments.
-- Dynamic scaling of deployments based on network usage metrics.
-- Customizable configurations through a YAML file.
+- Automatically scales PVC based on defined metrics.
+- Monitors ingress and egress bandwidth.
+- Easy integration with existing Kubernetes clusters.
 
 ## Prerequisites
+- Go version **1.19** or higher
+- Kubernetes cluster
+- Prometheus (for monitoring metrics)
 
-- Kubernetes cluster with sufficient permissions to manage PVCs and deployments.
-- Prometheus installed and configured to scrape metrics from the Kubernetes cluster.
-- Go (version 1.18 or higher) for building the project.
-
-## Getting Started
-
-1. **Clone the Repository:**
-
+## Installation Instructions
+1. Clone the repository:
    ```bash
-   git clone https://your-repo-url.git
+   git clone https://github.com/zeldebro/k8s-resource-autoscaler.git
    cd k8s-resource-autoscaler
    ```
 
-2. **Install Dependencies:**
+2. Ensure you have Go installed and set up:
+   ```bash
+   go version # Check if Go is installed
+   ```
 
-   Ensure you have Go modules enabled and install necessary dependencies.
-
+3. Run `go mod tidy` to install necessary dependencies:
    ```bash
    go mod tidy
    ```
 
-3. **Configure Storage Class Annotations:**
+4. Start the application in different modes:
+   - To run the autoscaler for PVCs:
+     ```bash
+     go run main.go --mode=pvc
+     ```
+   - To run the autoscaler for both PVCs and ingress:
+     ```bash
+     go run main.go --mode=pvc,ingress
+     ```
+   - To run the autoscaler for ingress only:
+     ```bash
+     go run main.go --mode=ingress
+     ```
 
-   To enable the autoscaling feature for PVCs, you need to ensure that your storage class has the correct annotations. Here's an example of a storage class with the required annotations:
+## Usage Guidelines
+- Configure the autoscaler by modifying the configuration files as needed.
+- Ensure that Prometheus is correctly set up to gather metrics.
 
+## Configuration Examples
+
+### Scenario: Automatic PVC Resizing
+Suppose you have a PVC named `foo-pvc` with an initial size of **1Gi**. As data is added, the PVC reaches its capacity, and you don't want to restart or kill the pod. By setting a threshold for the PVC, the autoscaler can automatically resize it when it reaches the specified limit.
+
+1. **Initial PVC Configuration**:
    ```yaml
-   apiVersion: storage.k8s.io/v1
-   kind: StorageClass
+   apiVersion: v1
+   kind: PersistentVolumeClaim
    metadata:
-     name: your-storage-class
-   provisioner: your-provisioner
-   parameters:
-     allowVolumeExpansion: "true"  # This allows PVC size to be increased.
+     name: foo-pvc
+   spec:
+     accessModes:
+       - ReadWriteOnce
+     resources:
+       requests:
+         storage: 1Gi
    ```
 
-4. **Prometheus Configuration:**
-
-   Ensure Prometheus is set up to scrape metrics from the necessary endpoints. Your Prometheus configuration should include the following job definitions to scrape Kubernetes metrics:
-
+2. **Threshold Configuration**:
+   In your `values.yaml`, you can define a threshold that triggers resizing:
    ```yaml
-   scrape_configs:
-     - job_name: 'kubernetes-pods'
-       kubernetes_sd_configs:
-         - role: pod
-       relabel_configs:
-         - source_labels: [__meta_kubernetes_namespace]
-           action: keep
-           regex: your-namespace
+   pvc:
+     name: foo-pvc
+     threshold: 90 # percentage
+     increment: 0.5 # increase size by 0.5Gi when threshold is reached
    ```
 
-5. **Configuration File:**
+3. **Expected Behavior**:
+   When the usage of `foo-pvc` reaches **90%**, the autoscaler will automatically resize the PVC from **1Gi** to **1.5Gi** without requiring any pod restarts or manual intervention.
 
-   Create a configuration file `config.yaml` with the following structure:
-
-   ```yaml
-   Prometheus:
-     URL: "http://your-prometheus-url"
-   Thresholds:
-     DiskUsage:
-       Resize: 80  # Resize threshold percentage for PVCs
-     NetworkUsage:
-       Ingress:
-         Scale: 1000000  # Ingress bandwidth threshold in bytes/sec
-   DesiredReplicaCount: 3  # Desired number of replicas for scaling
-   Interval: 5  # Monitoring interval in minutes
-   ```
-
-6. **Running the Autoscaler:**
-
-   You can run the autoscaler with the following command, specifying the mode of operation (either `pvc`, `ingress`, or both):
-
-   ```bash
-   go run main.go -mode pvc,ingress
-   ```
-
-## Usage
-
-- The autoscaler continuously monitors PVC usage and network traffic.
-- When disk usage exceeds the configured threshold, it automatically resizes the PVC.
-- If ingress traffic exceeds the defined threshold, the autoscaler scales up the deployment to handle increased traffic.
-
-## Logs
-
-The application logs can provide insights into the operations performed by the autoscaler. Logs will indicate when PVCs are resized and when deployments are scaled based on network usage.
-
-## Example Metrics
-
-- **PVC Resizing**: If a PVC usage exceeds 80%, the autoscaler will attempt to resize it automatically.
-- **Ingress Bandwidth**: If ingress bandwidth exceeds 1,000,000 bytes/sec, the autoscaler will scale the deployment up to the desired number of replicas.
-
-## Contributing
-
-Contributions are welcome! If you have suggestions or improvements, feel free to open an issue or submit a pull request.
-
-## License
-
-This project is licensed under the MIT License.
-
+### Ingress Example
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-ingress
+spec:
+  rules:
+  - host: myapp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: my-service
+            port:
+              number: 80
 ```
 
-### Notes
-- **Adjust Links**: Replace `https://your-repo-url.git` and `http://your-prometheus-url` with actual URLs for your repository and Prometheus server.
-- **Custom Parameters**: Modify any specific parameters as needed based on your implementation details.
-- **Annotations**: Ensure the annotations mentioned are applicable to your storage class and required for your PVCs.
+### Egress Example
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: my-egress-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          role: db
+    ports:
+    - protocol: TCP
+      port: 5432
+```
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+- [Kubernetes Documentation](https://kubernetes.io/docs/home/)
+- [Prometheus Documentation](https://prometheus.io/docs/introduction/overview/)
